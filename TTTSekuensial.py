@@ -2,30 +2,36 @@ from enum import Enum
 import time
 import random
 
+# Variabel untuk pemain, komputer, dan status kosong
 PLAYER = 'X'
 COMPUTER = 'O'
 EMPTY = '_'
 BOARD_SIZE = 5
 NUMBER_OF_PLAYERS = 1
 
+# Exception jika posisi tidak kosong
 class NoneEmptyPosition(Exception):
     pass
 
+# Exception jika posisi diluar range
 class OutOfRange(Exception):
     pass
 
+# Status permainan
 class GameState(Enum):
-    tie = 'Tie'
-    notEnd = 'notEnd'
-    o = 'O'  # computer
-    x = 'X'  # player
+    tie = 'Tie'  
+    notEnd = 'notEnd'  
+    o = 'O' 
+    x = 'X'  
 
+# Board Game
 class Board:
     def __init__(self, size):
         self.mSize = size
         self.mBoard = [[EMPTY for x in range(size)] for y in range(size)]
         self.lastMove = None
 
+    # Fungsi untuk mencetak board
     def print(self):
         for i in range(self.mSize):
             for j in range(self.mSize):
@@ -35,6 +41,7 @@ class Board:
                     print(self.mBoard[i][j], end='')
             print()
 
+    # Fungsi untuk mendapatkan posisi papan dari indeks 
     def getBoardPosition(self, position):
         column = position % self.mSize
         row = position // self.mSize
@@ -75,6 +82,7 @@ class Board:
     def checkIfOnSecondaryDiagonal(self, position):
         return position % (self.mSize - 1) == 0
 
+    # Gambar X di papan
     def drawX(self, position):
         self.lastMove = position
         (row, column) = self.getBoardPosition(position)
@@ -84,6 +92,7 @@ class Board:
         (row, column) = self.getBoardPosition(position)
         self.mBoard[row][column] = EMPTY
 
+    # Gambar O di papan
     def drawO(self, position):
         self.lastMove = position
         (row, column) = self.getBoardPosition(position)
@@ -96,6 +105,7 @@ class Board:
     def all_same(self, listToBeChecked, char):
         return all(x == char for x in listToBeChecked)
 
+# Fungsi minimax untuk AI
 def minimax(board, depth, isMax, alpha, beta):
     moves = [i for i in range(board.mSize ** 2) if board.checkIfRubricEmpty(i)]
     score = evaluate(board)
@@ -138,6 +148,7 @@ def minimax(board, depth, isMax, alpha, beta):
                 break
         return best, position
 
+# Fungsi evaluasi untuk menghitung skor
 def evaluate(board):
     score = 0
     for i in range(board.mSize):
@@ -149,6 +160,7 @@ def evaluate(board):
         score += getScoreLine(diagonals[i])
     return score
 
+# Fungsi untuk mendapatkan skor dari satu baris/kolom
 def getScoreLine(line):
     score = 0
     oSum, xSum, emptySum = calculateLine(line)
@@ -164,6 +176,7 @@ def calculateLine(line):
     emptySum = line.count(EMPTY)
     return oSum, xSum, emptySum
 
+# Cek status permainan
 def checkGameState(board):
     if checkForWin(board, 0):
         return GameState.x
@@ -176,6 +189,7 @@ def checkGameState(board):
 
     return GameState.notEnd
 
+# Cek apakah ada yang menang
 def checkForWin(board, turn):
     char = PLAYER if turn % 2 == 0 else COMPUTER
     lastMove = board.getLastMove()
@@ -195,6 +209,7 @@ def checkForWin(board, turn):
 
     return False
 
+# Cek apakah permainan berakhir seri
 def checkForTie(board):
     for i in range(board.mSize ** 2):
         if board.checkIfRubricEmpty(i):
@@ -212,6 +227,7 @@ class Game:
         self.coinFlip()
         self.mBestMove = 0
 
+    # Penentuan giliran pertama
     def coinFlip(self):
         turn = random.choice(['computer', 'player'])
         if turn == 'computer':
@@ -220,6 +236,7 @@ class Game:
         else:
             self.mTurn = 0
 
+    # Input nama player
     def getPlayersNames(self):
         counter = 1
         while counter <= self.mNumberOfPlayers:
@@ -239,6 +256,7 @@ class Game:
             except Exception:
                 print("unknown error")
 
+    # Fungsi untuk mendapatkan gerakan pemain
     def getPlayerMove(self):
         while True:
             try:
@@ -258,9 +276,11 @@ class Game:
             except Exception:
                 print("unknown error")
 
+    # Fungsi untuk menghasilkan semua gerakan yang mungkin
     def generate(self):
         return [i for i in range(self.mBoardSize ** 2) if self.mBoard.checkIfRubricEmpty(i)]
 
+    # Fungsi pencarian minimax
     def minimaxSearch(self):
         best_score = -float('inf')
         best_move = None
@@ -273,10 +293,11 @@ class Game:
 
     def evaluateMove(self, move, depth):
         self.mBoard.drawO(move)
-        score, _ = minimax(self.mBoard, depth, False, -float('inf'), float('inf'))  # Added alpha-beta pruning
+        score, _ = minimax(self.mBoard, depth, False, -float('inf'), float('inf'))  
         self.mBoard.drawEmpty(move)
         return score, move
 
+    # Memulai permainan
     def start(self):
         self.getPlayersNames()
         while True:
