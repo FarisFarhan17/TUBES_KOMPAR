@@ -1,0 +1,314 @@
+from enum import Enum
+import time
+import random
+
+PLAYER = 'X'
+COMPUTER = 'O'
+EMPTY = '_'
+BOARD_SIZE = 5
+NUMBER_OF_PLAYERS = 1
+
+class NoneEmptyPosition(Exception):
+    pass
+
+class OutOfRange(Exception):
+    pass
+
+class GameState(Enum):
+    tie = 'Tie'
+    notEnd = 'notEnd'
+    o = 'O'  # computer
+    x = 'X'  # player
+
+class Board:
+    def __init__(self, size):
+        self.mSize = size
+        self.mBoard = [[EMPTY for x in range(size)] for y in range(size)]
+        self.lastMove = None
+
+    def print(self):
+        for i in range(self.mSize):
+            for j in range(self.mSize):
+                if j < self.mSize-1:
+                    print(self.mBoard[i][j], end='|')
+                else:
+                    print(self.mBoard[i][j], end='')
+            print()
+
+    def getBoardPosition(self, position):
+        column = position % self.mSize
+        row = position // self.mSize
+        return row, column
+
+    def getLastMove(self):
+        return self.lastMove
+
+    def getRow(self, numberOfRow):
+        return self.mBoard[numberOfRow]
+
+    def getColumn(self, numberOFColumn):
+        return [row[numberOFColumn] for row in self.mBoard]
+
+    def getDiagonal(self):
+        diagonal1 = [self.mBoard[i][i] for i in range(self.mSize)]
+        diagonal2 = []
+        j = 0
+        for i in reversed(range(self.mSize)):
+            diagonal2.append(self.mBoard[i][j])
+            j += 1
+        return diagonal1, diagonal2
+
+    def getMainDiagonal(self):
+        return [self.mBoard[i][i] for i in range(self.mSize)]
+
+    def getSecondaryDiagonal(self):
+        diagonal = []
+        j = 0
+        for i in reversed(range(self.mSize)):
+            diagonal.append(self.mBoard[i][j])
+            j += 1
+        return diagonal
+
+    def checkIfOnMainDiagonal(self, position):
+        return position % (self.mSize + 1) == 0
+
+    def checkIfOnSecondaryDiagonal(self, position):
+        return position % (self.mSize - 1) == 0
+
+    def drawX(self, position):
+        self.lastMove = position
+        (row, column) = self.getBoardPosition(position)
+        self.mBoard[row][column] = PLAYER
+
+    def drawEmpty(self, position):
+        (row, column) = self.getBoardPosition(position)
+        self.mBoard[row][column] = EMPTY
+
+    def drawO(self, position):
+        self.lastMove = position
+        (row, column) = self.getBoardPosition(position)
+        self.mBoard[row][column] = COMPUTER
+
+    def checkIfRubricEmpty(self, position):
+        (row, column) = self.getBoardPosition(position)
+        return self.mBoard[row][column] == EMPTY
+
+    def all_same(self, listToBeChecked, char):
+        return all(x == char for x in listToBeChecked)
+
+def minimax(board, depth, isMax, alpha, beta):
+    moves = [i for i in range(board.mSize ** 2) if board.checkIfRubricEmpty(i)]
+    score = evaluate(board)
+    position = None
+
+    if not moves or depth == 0:
+        gameResult = checkGameState(board)
+        if gameResult == GameState.x:
+            return -10**(board.mSize + 1), position
+        elif gameResult == GameState.o:
+            return 10**(board.mSize + 1), position
+        elif gameResult == GameState.tie:
+            return 0, position
+        return score, position
+
+    if isMax:
+        best = -float('inf')
+        for move in moves:
+            board.drawO(move)
+            score, _ = minimax(board, depth - 1, not isMax, alpha, beta)
+            board.drawEmpty(move)
+            if score > best:
+                best = score
+                position = move
+            alpha = max(alpha, best)
+            if beta <= alpha:
+                break
+        return best, position
+    else:
+        best = float('inf')
+        for move in moves:
+            board.drawX(move)
+            score, _ = minimax(board, depth - 1, not isMax, alpha, beta)
+            board.drawEmpty(move)
+            if score < best:
+                best = score
+                position = move
+            beta = min(beta, best)
+            if beta <= alpha:
+                break
+        return best, position
+
+def evaluate(board):
+    score = 0
+    for i in range(board.mSize):
+        score += getScoreLine(board.getRow(i))
+        score += getScoreLine(board.getColumn(i))
+
+    diagonals = board.getDiagonal()
+    for i in range(2):
+        score += getScoreLine(diagonals[i])
+    return score
+
+def getScoreLine(line):
+    score = 0
+    oSum, xSum, emptySum = calculateLine(line)
+    if xSum == 0 and oSum != 0:
+        score += 10 ** (oSum - 1)
+    if oSum == 0 and xSum != 0:
+        score += -(10 ** (xSum - 1))
+    return score
+
+def calculateLine(line):
+    oSum = line.count(COMPUTER)
+    xSum = line.count(PLAYER)
+    emptySum = line.count(EMPTY)
+    return oSum, xSum, emptySum
+
+def checkGameState(board):
+    if checkForWin(board, 0):
+        return GameState.x
+
+    if checkForWin(board, 1):
+        return GameState.o
+
+    if checkForTie(board):
+        return GameState.tie
+
+    return GameState.notEnd
+
+def checkForWin(board, turn):
+    char = PLAYER if turn % 2 == 0 else COMPUTER
+    lastMove = board.getLastMove()
+    row, col = board.getBoardPosition(lastMove)
+
+    if board.all_same(board.getRow(row), char) or \
+            board.all_same(board.getColumn(col), char):
+        return True
+
+    if board.checkIfOnMainDiagonal(lastMove):
+        if board.all_same(board.getMainDiagonal(), char):
+            return True
+
+    if board.checkIfOnSecondaryDiagonal(lastMove):
+        if board.all_same(board.getSecondaryDiagonal(), char):
+            return True
+
+    return False
+
+def checkForTie(board):
+    for i in range(board.mSize ** 2):
+        if board.checkIfRubricEmpty(i):
+            return False
+    return True
+
+class Game:
+    def __init__(self, numberOfPlayers, boardSize):
+        self.mBoard = Board(boardSize)
+        self.mBoardSize = boardSize
+        self.mNumberOfPlayers = numberOfPlayers
+        self.mNamesList = [' '] * numberOfPlayers
+        self.mTurn = None
+        self.mComputerFirstPosition = None
+        self.coinFlip()
+        self.mBestMove = 0
+
+    def coinFlip(self):
+        turn = random.choice(['computer', 'player'])
+        if turn == 'computer':
+            self.mComputerFirstPosition = random.randrange(self.mBoard.mSize ** 2)
+            self.mTurn = 1
+        else:
+            self.mTurn = 0
+
+    def getPlayersNames(self):
+        counter = 1
+        while counter <= self.mNumberOfPlayers:
+            try:
+                playerName = input('please enter the name of player' + str(counter))
+                if not playerName:
+                    raise ValueError("field cannot be empty, please enter name")
+                if not playerName.isalpha():
+                    raise ValueError("only letters are allowed")
+                if playerName in self.mNamesList:
+                    raise ValueError("name already chosen please choose different name")
+
+                self.mNamesList[counter - 1] = playerName
+                counter += 1
+            except ValueError as e:
+                print(e)
+            except Exception:
+                print("unknown error")
+
+    def getPlayerMove(self):
+        while True:
+            try:
+                playerMove = int(input(self.mNamesList[self.mTurn] + ' please select rubric'))
+                if not (0 <= playerMove <= (self.mBoardSize ** 2 - 1)):
+                    raise OutOfRange("Wrong position, please insert different position")
+                if not self.mBoard.checkIfRubricEmpty(playerMove):
+                    raise NoneEmptyPosition("Rubric is none empty, please insert different position")
+                self.mBoard.drawX(playerMove)
+                return
+            except NoneEmptyPosition as e:
+                print(e)
+            except OutOfRange as e:
+                print(e)
+            except ValueError:
+                print("Only numbers are allowed")
+            except Exception:
+                print("unknown error")
+
+    def generate(self):
+        return [i for i in range(self.mBoardSize ** 2) if self.mBoard.checkIfRubricEmpty(i)]
+
+    def minimaxSearch(self):
+        best_score = -float('inf')
+        best_move = None
+        for move in self.generate():
+            score, _ = self.evaluateMove(move, 4)  # Depth akan mengaruh ke kecepetan eksekusi dan keakuratan computer
+            if score > best_score:
+                best_score = score
+                best_move = move
+        return best_move
+
+    def evaluateMove(self, move, depth):
+        self.mBoard.drawO(move)
+        score, _ = minimax(self.mBoard, depth, False, -float('inf'), float('inf'))  # Added alpha-beta pruning
+        self.mBoard.drawEmpty(move)
+        return score, move
+
+    def start(self):
+        self.getPlayersNames()
+        while True:
+            self.mBoard.print()
+            self.mTurn %= 2
+            if self.mTurn % 2 == 0:
+                self.getPlayerMove()
+            else:
+                print('computer please select rubric')
+                start_time = time.time()
+                if self.mComputerFirstPosition is not None:
+                    computerMove = self.mComputerFirstPosition
+                    self.mComputerFirstPosition = None
+                else:
+                    computerMove = self.minimaxSearch()
+                end_time = time.time()
+                print(f"Computer's move took {end_time - start_time:.6f} seconds.")
+                self.mBoard.drawO(computerMove)
+
+            gameResult = checkGameState(self.mBoard)
+            if gameResult != GameState.notEnd:
+                self.mBoard.print()
+                if gameResult == GameState.tie:
+                    print('The game is a tie')
+                else:
+                    if gameResult == GameState.x:
+                        print(self.mNamesList[self.mTurn] + ' is the winner!')
+                    else:
+                        print('computer is the winner!')
+                break
+            self.mTurn += 1
+
+if __name__ == "__main__":
+    game = Game(NUMBER_OF_PLAYERS, BOARD_SIZE)
+    game.start()
